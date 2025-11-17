@@ -59,12 +59,15 @@ body {
     pointer-events: auto;
     background: transparent;
   }
-  
+
+
   #scratchCaption {
-    margin-top: 2rem;
-    color: #7a5e58;
-    font-weight: 600;
-    z-index: 10;
-    position: relative;
-  }
+  margin-top: 2rem;     /* spacing above the caption */
+  color: #7a5e58;       /* caption color */
+  font-weight: 600;     /* semi-bold text */
+  z-index: 10;          /* stacking above lower layers (works because of position) */
+  position: relative;   /* enables z-index to take effect */
+  font-size: 28px;      /* increase text size */
+  text-align: center;   /* keep it centered under the image */
+}
   
