@@ -45,34 +45,116 @@ function drawFlowers() {
 }
 drawFlowers();
 
-// Kaparós kép és logika (unchanged)
+
+// Kaparós kép és logika (kept, with safe preload)
 var bridge = document.getElementById("bridge"),
     bridgeCanvas = bridge.getContext('2d'),
-    brushRadius = (bridge.width / 100) * 5,
-    img = new Image();
+    brushRadius = (bridge.width / 100) * 5;
 
+// Keep your original minimum radius logic
 if (brushRadius < 50) { brushRadius = 50; }
 
-img.onload = function () {
-  bridgeCanvas.drawImage(img, 0, 0, bridge.width, bridge.height);
-};
+// NEW: preload images in order so pic0 draws before pic1 is shown
+var underlyingImgEl = document.getElementById('underlyingImage');
 
-img.src = 'pic0.png';
+// Hide underlying until overlay drawn and image ready
+if (underlyingImgEl) {
+  underlyingImgEl.style.visibility = 'hidden';
+}
 
-// Új: zene lejátszása helyben
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    var im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = reject;
+    im.decoding = 'async';
+    im.src = src;
+  });
+}
 
+(async function ensureOrder() {
+  try {
+    // 1) Load and draw overlay (pic0) to the canvas
+    const overlay = await loadImage('pic0.png');
+    bridgeCanvas.clearRect(0, 0, bridge.width, bridge.height);
+    bridgeCanvas.globalCompositeOperation = 'source-over';
+    bridgeCanvas.drawImage(overlay, 0, 0, bridge.width, bridge.height);
+
+    // 2) Load the underlying image (pic1) then reveal it
+    const underlying = await loadImage('pic1.png');
+    if (underlyingImgEl) {
+      underlyingImgEl.src = underlying.src;
+      underlyingImgEl.style.visibility = 'visible';
+    }
+  } catch (e) {
+    console.log('Image preload failed:', e);
+  }
+})();
+
+
+// Új: zene lejátszása helyben (adjusted for mobile policies)
 var music = new Audio('music.mp3');  // Helyi mp3 fájl
 music.loop = true;
 var hasStartedMusic = false;
 
-function startMusicOnScratch() {
-  if (!hasStartedMusic) {
-    music.play().catch(e => {
-      console.log("Playback error:", e);
-    });
+// STRICT mobile policy: call play() synchronously in user gesture
+function tryUnlockAudioSync() {
+  if (hasStartedMusic) return;
+  var p = music.play();
+  if (p && typeof p.then === 'function') {
+    p.then(() => { hasStartedMusic = true; })
+     .catch((e) => {
+       // If blocked, leave hasStartedMusic false; a fallback button can be used
+       // console.log('Playback blocked:', e);
+     });
+  } else {
     hasStartedMusic = true;
   }
 }
+
+function startMusicOnScratch() {
+  // Kept for compatibility with your original call site,
+  // but tryUnlockAudioSync() should be called first in the event handler.
+  if (!hasStartedMusic) {
+    var p = music.play();
+    if (p && p.catch) p.catch(() => {});
+    hasStartedMusic = true;
+  }
+}
+
+// Optional: small visible fallback button if strict browsers still block
+(function ensurePlayButton() {
+  var btnId = 'playMusic';
+  if (!document.getElementById(btnId)) {
+    var btn = document.createElement('button');
+    btn.id = btnId;
+    btn.textContent = 'Play music';
+    btn.style.position = 'fixed';
+    btn.style.bottom = '1rem';
+    btn.style.right = '1rem';
+    btn.style.zIndex = '9999';
+    btn.style.padding = '0.6rem 1rem';
+    btn.style.borderRadius = '8px';
+    btn.style.border = 'none';
+    btn.style.background = '#7a5e58';
+    btn.style.color = '#fff';
+    btn.style.fontWeight = '600';
+    btn.style.cursor = 'pointer';
+    document.body.appendChild(btn);
+
+    btn.addEventListener('click', function () {
+      var p = music.play();
+      if (p && p.then) {
+        p.then(function () {
+          hasStartedMusic = true;
+          btn.style.display = 'none';
+        }).catch(function () {
+          // Keep button visible to let user try again
+        });
+      }
+    }, { passive: true });
+  }
+})();
 
 function detectLeftButton(event) {
   if ('buttons' in event) {
@@ -93,7 +175,9 @@ function getBrushPos(xRef, yRef) {
 }
 
 function drawDot(mouseX, mouseY) {
+  // Keep your original flow
   if (!hasStartedMusic) {
+    // Call was here before; keep it
     startMusicOnScratch();
   }
   bridgeCanvas.globalCompositeOperation = "destination-out";
@@ -103,19 +187,57 @@ function drawDot(mouseX, mouseY) {
   bridgeCanvas.globalCompositeOperation = "source-over";
 }
 
-bridge.addEventListener("mousemove", function (e) {
-  var brushPos = getBrushPos(e.clientX, e.clientY);
-  var leftBut = detectLeftButton(e);
-  if (leftBut === true || leftBut === 1) {
-    drawDot(brushPos.x, brushPos.y);
-  }
-}, false);
+// Prefer pointer events if available for cross-browser consistency
+var supportsPointer = 'onpointerdown' in window;
 
-bridge.addEventListener("touchmove", function (e) {
-  e.preventDefault();
-  var touch = e.targetTouches[0];
-  if (touch) {
-    var brushPos = getBrushPos(touch.pageX, touch.pageY);
+if (supportsPointer) {
+  bridge.addEventListener("pointerdown", function (e) {
+    // CRITICAL: call play() first in the same event handler for iOS Safari/Chrome
+    tryUnlockAudioSync();
+
+    var brushPos = getBrushPos(e.clientX, e.clientY);
     drawDot(brushPos.x, brushPos.y);
-  }
-}, false);
+  }, { passive: true });
+
+  bridge.addEventListener("pointermove", function (e) {
+    if (e.pressure > 0 || (e.buttons & 1) === 1) {
+      var brushPos = getBrushPos(e.clientX, e.clientY);
+      drawDot(brushPos.x, brushPos.y);
+    }
+  }, { passive: true });
+} else {
+  // Original mouse listeners (kept)
+  bridge.addEventListener("mousemove", function (e) {
+    var brushPos = getBrushPos(e.clientX, e.clientY);
+    var leftBut = detectLeftButton(e);
+    if (leftBut === true || leftBut === 1) {
+      drawDot(brushPos.x, brushPos.y);
+    }
+  }, false);
+
+  // Add mousedown to unlock audio on desktop without pointer events
+  bridge.addEventListener("mousedown", function (e) {
+    tryUnlockAudioSync();
+    var brushPos = getBrushPos(e.clientX, e.clientY);
+    drawDot(brushPos.x, brushPos.y);
+  }, { passive: true });
+
+  // Original touchmove (kept) + touchstart to unlock
+  bridge.addEventListener("touchstart", function (e) {
+    tryUnlockAudioSync();
+    var t = e.targetTouches[0];
+    if (t) {
+      var brushPos = getBrushPos(t.pageX, t.pageY);
+      drawDot(brushPos.x, brushPos.y);
+    }
+  }, { passive: true });
+
+  bridge.addEventListener("touchmove", function (e) {
+    e.preventDefault();
+    var touch = e.targetTouches[0];
+    if (touch) {
+      var brushPos = getBrushPos(touch.pageX, touch.pageY);
+      drawDot(brushPos.x, brushPos.y);
+    }
+  }, false);
+}
