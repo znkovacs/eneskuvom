@@ -1,0 +1,70 @@
+body {
+    margin: 0;
+    font-family: Avenir, sans-serif;
+    overflow: hidden;
+    background: #f9f5f1;
+    height: 100vh;
+    width: 100vw;
+  }
+  
+  #animatedBackground {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 0;
+    pointer-events: none;
+    background: #f9f5f1;
+  }
+  
+  #mainContent {
+    position: relative;
+    width: 750px;
+    max-width: 100vw;
+    margin: 3rem auto 4rem auto;
+    text-align: center;
+    z-index: 1;
+  }
+  
+  #scratchArea {
+    position: relative;
+    width: 100%;
+    max-width: 750px;
+    margin: 0 auto;
+    z-index: 1;
+    display: inline-block;
+  }
+  
+  #underlyingImage {
+    width: 100%;
+    max-width: 750px;
+    height: auto;
+    display: block;
+    position: relative;
+    z-index: 1;
+    user-select: none;
+  }
+  
+  #bridge {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    max-width: 750px;
+    z-index: 2;
+    cursor: crosshair;
+    cursor: url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/4273/circular-cursor.png) 53 53, crosshair;
+    display: block;
+    pointer-events: auto;
+    background: transparent;
+  }
+  
+  #scratchCaption {
+    margin-top: 2rem;
+    color: #7a5e58;
+    font-weight: 600;
+    z-index: 10;
+    position: relative;
+  }
+  
